@@ -1,0 +1,54 @@
+version: "3"
+
+x-app: &app
+  build:
+    context: .
+    args:
+      RAILS_ENV: development
+      PG_MAJOR: '15'
+      NODE_MAJOR: '18'
+  environment: &env
+    NODE_ENV: ${NODE_ENV:-development}
+  tmpfs:
+    - /tmp
+    - /app/tmp/pids
+
+x-backend: &backend
+  <<: *app
+  stdin_open: true
+  tty: true
+  environment: &backend_environment
+    <<: *env
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_HOST: database
+  volumes:
+      - .:/app
+      - backend_data:/usr/local/bundle
+  depends_on: &backend_depends_on
+    database:
+      condition: service_healthy
+
+services:
+  database:
+    hostname: strava_omniauth_database
+    image: postgres:15
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 5s
+  web:
+    <<: *backend
+    hostname: strava_omniauth_web
+    ports:
+      - "3000:3000"
+
+volumes:
+  backend_data:
+  database-data:
+    driver: local
